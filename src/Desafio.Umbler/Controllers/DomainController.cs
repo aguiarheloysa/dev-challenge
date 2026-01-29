@@ -1,77 +1,48 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using Desafio.Umbler.Interface;
 using Microsoft.AspNetCore.Mvc;
-using Desafio.Umbler.Models;
-using Whois.NET;
-using Microsoft.EntityFrameworkCore;
-using DnsClient;
+using System;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace Desafio.Umbler.Controllers
 {
-    [Route("api")]
-    public class DomainController : Controller
+    [ApiController]
+    [Route("api/domain")]
+    public class DomainController : ControllerBase
     {
-        private readonly DatabaseContext _db;
+        private readonly IDomainService _service;
 
-        public DomainController(DatabaseContext db)
+        public DomainController(IDomainService service)
         {
-            _db = db;
+            _service = service;
         }
 
-        [HttpGet, Route("domain/{domainName}")]
+        [HttpGet("{domainName}")]
         public async Task<IActionResult> Get(string domainName)
         {
-            var domain = await _db.Domains.FirstOrDefaultAsync(d => d.Name == domainName);
-
-            if (domain == null)
+            
+            if (!Regex.IsMatch(domainName, @"^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$"))
             {
-                var response = await WhoisClient.QueryAsync(domainName);
-
-                var lookup = new LookupClient();
-                var result = await lookup.QueryAsync(domainName, QueryType.ANY);
-                var record = result.Answers.ARecords().FirstOrDefault();
-                var address = record?.Address;
-                var ip = address?.ToString();
-
-                var hostResponse = await WhoisClient.QueryAsync(ip);
-
-                domain = new Domain
-                {
-                    Name = domainName,
-                    Ip = ip,
-                    UpdatedAt = DateTime.Now,
-                    WhoIs = response.Raw,
-                    Ttl = record?.TimeToLive ?? 0,
-                    HostedAt = hostResponse.OrganizationName
-                };
-
-                _db.Domains.Add(domain);
+                return BadRequest("Domínio inválido. Utilize o formato exemplo.com");
             }
 
-            if (DateTime.Now.Subtract(domain.UpdatedAt).TotalMinutes > domain.Ttl)
+            try
             {
-                var response = await WhoisClient.QueryAsync(domainName);
-
-                var lookup = new LookupClient();
-                var result = await lookup.QueryAsync(domainName, QueryType.ANY);
-                var record = result.Answers.ARecords().FirstOrDefault();
-                var address = record?.Address;
-                var ip = address?.ToString();
-
-                var hostResponse = await WhoisClient.QueryAsync(ip);
-
-                domain.Name = domainName;
-                domain.Ip = ip;
-                domain.UpdatedAt = DateTime.Now;
-                domain.WhoIs = response.Raw;
-                domain.Ttl = record?.TimeToLive ?? 0;
-                domain.HostedAt = hostResponse.OrganizationName;
+                var response = await _service.GetDomainAsync(domainName);
+                return Ok(response);
             }
-
-            await _db.SaveChangesAsync();
-
-            return Ok(domain);
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Erro interno inesperado");
+            }
         }
     }
 }

@@ -28,12 +28,12 @@ namespace Desafio.Umbler
                 // Use 'MariaDbServerVersion' for MariaDB.
                 // Alternatively, use 'ServerVersion.AutoDetect(connectionString)'.
                 // For common usages, see pull request #1233.
-                var serverVersion = new MySqlServerVersion(new Version(8, 0, 27));
+                // var serverVersion = new MySqlServerVersion(new Version(8, 0, 27));
 
                 // Replace 'YourDbContext' with the name of your own DbContext derived class.
                 services.AddDbContext<DatabaseContext>(
                     dbContextOptions => dbContextOptions
-                        .UseMySql(connectionString, serverVersion)
+                        .UseSqlite(connectionString)
                         // The following three options help with debugging, but should
                         // be changed or removed for production.
                         .LogTo(Console.WriteLine, LogLevel.Information)
@@ -41,7 +41,9 @@ namespace Desafio.Umbler
                         .EnableDetailedErrors()
                 );
 
-
+            services.AddScoped<Desafio.Umbler.Repositories.DomainRepository>();
+            services.AddScoped<Desafio.Umbler.Interface.IDomainService, Desafio.Umbler.Service.DomainService>();
+            services.AddServerSideBlazor();
             services.AddControllersWithViews();
         }
 
@@ -62,6 +64,7 @@ namespace Desafio.Umbler
 
             app.UseEndpoints(endpoints =>
             {
+                endpoints.MapBlazorHub();
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller=Home}/{action=Index}/{id?}");

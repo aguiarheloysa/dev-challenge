@@ -1,0 +1,108 @@
+@using Desafio.Umbler.DTOs
+@using Desafio.Umbler.Interface
+@inject IDomainService DomainService
+
+<div class="row" id="box-result-blazor">
+    <div class="col-lg-9 col-md-8">
+        <label class="sr-only" for="txt-search-blazor">Domínio</label>
+        <input class="form-control form-control-lg domain"
+               id="txt-search-blazor"
+               @bind="DomainName"
+               @bind:event="oninput"
+               @onkeypress="@(e => KeyPress(e))"
+               placeholder="Digite o Domínio que deseja pesquisar" type="text" />
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+             <div class="text-danger mt-2">@ErrorMessage</div>
+        }
+    </div>
+    <div class="col-lg-3 col-md-4 text-xs-right">
+        <button type="button" id="btn-search-blazor" class="btn btn-success btn-block btn-lg text-xs-center"
+                @onclick="SearchDomain" disabled="@IsLoading">
+            @if (IsLoading)
+            {
+                <span>Pesquisando...</span>
+            }
+            else
+            {
+                <i class="icon icon-search icon-white mr-1"></i>
+                <span>Pesquisar...</span>
+            }
+        </button>
+    </div>
+</div>
+
+@if (Result != null)
+{
+    <div class="container w-100 mt-4">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">Resultado para @Result.Name</h3>
+                
+                <dl class="row">
+                    <dt class="col-sm-3">IP</dt>
+                    <dd class="col-sm-9">@Result.Ip</dd>
+
+                    <dt class="col-sm-3">Hospedado em</dt>
+                    <dd class="col-sm-9">@Result.HostedAt</dd>
+                </dl>
+
+                @if (!string.IsNullOrEmpty(Result.WhoIs))
+                {
+                    <h4 class="mt-4">WhoIs</h4>
+                    <div class="bg-light p-3 border rounded" style="white-space: pre-wrap; font-family: monospace;">
+                        @Result.WhoIs
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string DomainName { get; set; }
+    private DomainViewModel Result { get; set; }
+    private bool IsLoading { get; set; }
+    private string ErrorMessage { get; set; }
+
+    private async Task SearchDomain()
+    {
+        ErrorMessage = null;
+        Result = null;
+
+        if (string.IsNullOrWhiteSpace(DomainName))
+        {
+            ErrorMessage = "O domínio não pode estar vazio.";
+            return;
+        }
+
+        // Regex validation matching backend
+        if (!System.Text.RegularExpressions.Regex.IsMatch(DomainName, @"^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$"))
+        {
+             ErrorMessage = "Domínio inválido. Utilize o formato exemplo.com";
+             return;
+        }
+
+        IsLoading = true;
+        try
+        {
+            Result = await DomainService.GetDomainAsync(DomainName);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task KeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchDomain();
+        }
+    }
+}
