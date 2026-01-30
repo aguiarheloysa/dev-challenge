@@ -93,4 +93,90 @@ Se você rodar o projeto e testar um domínio, verá que ele já está funcionan
 
 # Modificações:
 
-- DESCREVA AQUI O OBJETIVO DAS MODIFICAÇÕES...
+Este documento descreve as modificações realizadas no projeto. As alterações foram organizadas seguindo os princípios de arquitetura limpa, com separação clara de responsabilidade entre camadas.
+
+# Controller
+
+DomainController.cs
+É responsável por expor endpoints HTTP para consulta de domínios.
+Responsabilidades:
+Receber requisições HTTP, validar entrada básica, delegar processamento ao Service e por fim retornar a resposta da requisição formatada.
+
+# Service
+
+DomainService.cs
+Implementa o caso de uso principal de consulta de domínio.
+Responsabilidades:
+Orquestrar o fluxo de consulta, verificar cache no repositório, consultar DNS/WHOIS externo quando necessário, atualizar cache persistido, mapear dados para DTO de saída, injeção de dependências via interfaces, uso de wrapper para cliente WHOIS, ajustes para permitir mockar testes.
+
+DomainAPIService.cs
+Encapsula integrações externas (DNS/WHOIS)
+Responsabilidades:
+Isolar chamadas externas.
+
+WhoisClientWrapper.cs
+Responsabilidades:
+Evitar dependência direta de bibliotecas externas no service principal.
+
+# Repository
+
+DomainRepository.cs
+Implementação de acesso a dados via Entity Framework Core.
+Responsabilidades:
+Buscar domínio no banco de dados, inserir registros, atualizar cachê, persistir resultados.
+
+# Models
+
+DatabaseContext - atualizado
+Responsabilidades:
+Mapear entidades, configurar o banco e gerenciar migrations.
+Desacoplamento: o DatabaseContext não possui mais a entidade Domain.
+
+Domain.cs
+Responsabilidades:
+Representar a entidade “Domain” do sistema, servir como contrato de dados interno da aplicação, mapear uma tabela do banco de dados
+
+DomainQueryResult.cs
+Responsabilidades:
+Modelagem de Resposta de Interface, simplificação de dados
+
+# Interface
+
+IDomainValidator.cs
+Responsabilidades:
+Separar validação da lógica de negócio.
+
+IWhoisClientWrapper.cs
+Responsabilidades:
+Isolar dependência externa, facilitar mocks/testes.
+
+# DTO
+	Objeto de transferência de dados da API.
+DomainDTO.cs
+Responsabilidades:
+Definir formato de saída, evitar exposição direta da entidade de domínio.
+
+# Camada de Interface de Usuário
+
+Index.cshtml
+Layout.cshtml
+Responsabilidades:
+Capturar o domínio informado, chamar o backend, exibir resultados formatados.
+
+# Docker-Compose
+
+Configuração de serviço de banco de dados
+app.db
+app.db-shm
+app.db-wal
+Justificativa: execução imediata, testes locais rápidos.
+
+
+# TESTES
+
+DomainServiceTests.cs
+Consulta em cache, consulta externa, atualização de cache expirado.
+
+ControllersTests.cs
+Mocks adequados, injeção de novas dependências, asserts atualizados.
+Justificativa: as refatorações de arquitetura exigiram atualizações dos testes.
