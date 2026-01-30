@@ -13,10 +13,14 @@ namespace Desafio.Umbler.Service
     public class DomainService : IDomainService
     {
         private readonly DomainRepository _repository;
+        private readonly ILookupClient _lookupClient;
+        private readonly IWhoisClientWrapper _whoisClient;
 
-        public DomainService(DomainRepository repository)
+        public DomainService(DomainRepository repository, ILookupClient lookupClient, IWhoisClientWrapper whoisClient)
         {
             _repository = repository;
+            _lookupClient = lookupClient;
+            _whoisClient = whoisClient;
         }
 
         public async Task<DomainViewModel> GetDomainAsync(string domainName)
@@ -65,14 +69,14 @@ namespace Desafio.Umbler.Service
         {
             try
             {
-                var whois = await WhoisClient.QueryAsync(domainName);
-                var lookup = new LookupClient();
-                var result = await lookup.QueryAsync(domainName, QueryType.A);
+                var whois = await _whoisClient.QueryAsync(domainName);
+                
+                var result = await _lookupClient.QueryAsync(domainName, QueryType.A);
                 var record = result.Answers.ARecords().FirstOrDefault();
 
                 if (record == null) return null;
 
-                var host = await WhoisClient.QueryAsync(record.Address.ToString());
+                var host = await _whoisClient.QueryAsync(record.Address.ToString());
 
                 return new Domain
                 {

@@ -1,13 +1,13 @@
 using Desafio.Umbler.Controllers;
+using Desafio.Umbler.Interface;
 using Desafio.Umbler.Models;
-using DnsClient;
+using Desafio.Umbler.DTOs;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
-using System;
 using System.Threading.Tasks;
+using System;
 
 namespace Desafio.Umbler.Test
 {
@@ -45,116 +45,67 @@ namespace Desafio.Umbler.Test
             Assert.IsNotNull(result);
             Assert.IsNotNull(model);
         }
-        
-        [TestMethod]
-        public void Domain_In_Database()
-        {
-            //arrange 
-            var options = new DbContextOptionsBuilder<DatabaseContext>()
-                .UseInMemoryDatabase(databaseName: "Find_searches_url")
-                .Options;
-
-            var domain = new Domain { Id = 1, Ip = "192.168.0.1", Name = "test.com", UpdatedAt = DateTime.Now, HostedAt = "umbler.corp", Ttl = 60, WhoIs = "Ns.umbler.com" };
-
-            // Insert seed data into the database using one instance of the context
-            using (var db = new DatabaseContext(options))
-            {
-                db.Domains.Add(domain);
-                db.SaveChanges();
-            }
-
-            // Use a clean instance of the context to run the test
-            using (var db = new DatabaseContext(options))
-            {
-                var controller = new DomainController(db);
-
-                //act
-                var response = controller.Get("test.com");
-                var result = response.Result as OkObjectResult;
-                var obj = result.Value as Domain;
-                Assert.AreEqual(obj.Id, domain.Id);
-                Assert.AreEqual(obj.Ip, domain.Ip);
-                Assert.AreEqual(obj.Name, domain.Name);
-            }
-        }
 
         [TestMethod]
-        public void Domain_Not_In_Database()
-        {
-            //arrange 
-            var options = new DbContextOptionsBuilder<DatabaseContext>()
-                .UseInMemoryDatabase(databaseName: "Find_searches_url")
-                .Options;
-
-            // Use a clean instance of the context to run the test
-            using (var db = new DatabaseContext(options))
-            {
-                var controller = new DomainController(db);
-
-                //act
-                var response = controller.Get("test.com");
-                var result = response.Result as OkObjectResult;
-                var obj = result.Value as Domain;
-                Assert.IsNotNull(obj);
-            }
-        }
-
-        [TestMethod]
-        public void Domain_Moking_LookupClient()
-        {
-            //arrange 
-            var lookupClient = new Mock<ILookupClient>();
-            var domainName = "test.com";
-
-            var dnsResponse = new Mock<IDnsQueryResponse>();
-            lookupClient.Setup(l => l.QueryAsync(domainName, QueryType.ANY, QueryClass.IN, System.Threading.CancellationToken.None)).ReturnsAsync(dnsResponse.Object);
-
-            //arrange 
-            var options = new DbContextOptionsBuilder<DatabaseContext>()
-                .UseInMemoryDatabase(databaseName: "Find_searches_url")
-                .Options;
-
-            // Use a clean instance of the context to run the test
-            using (var db = new DatabaseContext(options))
-            {
-                //inject lookupClient in controller constructor
-                var controller = new DomainController(db/*,IWhoisClient, lookupClient*/ );
-
-                //act
-                var response = controller.Get("test.com");
-                var result = response.Result as OkObjectResult;
-                var obj = result.Value as Domain;
-                Assert.IsNotNull(obj);
-            }
-        }
-
-        [TestMethod]
-        public void Domain_Moking_WhoisClient()
+        public async Task Domain_Search_Success()
         {
             //arrange
-            //whois is a static class, we need to create a class to "wrapper" in a mockable version of WhoisClient
-            //var whoisClient = new Mock<IWhoisClient>();
-            //var domainName = "test.com";
+            var mockService = new Mock<IDomainService>();
+            var expectedDomain = new DomainViewModel { Name = "test.com", Ip = "1.2.3.4", HostedAt = "TestHost", WhoIs = "TestWhoIs" };
+            
+            mockService.Setup(s => s.GetDomainAsync("test.com"))
+                       .ReturnsAsync(expectedDomain);
 
-            //whoisClient.Setup(l => l.QueryAsync(domainName)).Return();
+            var controller = new DomainController(mockService.Object);
 
-            ////arrange 
-            //var options = new DbContextOptionsBuilder<DatabaseContext>()
-            //    .UseInMemoryDatabase(databaseName: "Find_searches_url")
-            //    .Options;
+            //act
+            var response = await controller.Get("test.com");
+            var result = response as OkObjectResult;
+            var obj = result.Value as DomainViewModel;
 
-            //// Use a clean instance of the context to run the test
-            //using (var db = new DatabaseContext(options))
-            //{
-            //    //inject IWhoisClient in controller's constructor
-            //    var controller = new DomainController(db/*,IWhoisClient, ILookupClient*/);
+            //assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(200, result.StatusCode);
+            Assert.IsNotNull(obj);
+            Assert.AreEqual("test.com", obj.Name);
+            Assert.AreEqual("1.2.3.4", obj.Ip);
+        }
 
-            //    //act
-            //    var response = controller.Get("test.com");
-            //    var result = response.Result as OkObjectResult;
-            //    var obj = result.Value as Domain;
-            //    Assert.IsNotNull(obj);
-            //}
+        [TestMethod]
+         public async Task Domain_Search_Invalid_Domain()
+        {
+            //arrange
+            var mockService = new Mock<IDomainService>();
+            var controller = new DomainController(mockService.Object);
+
+            //act
+            var response = await controller.Get("invalid-domain");
+            var result = response as BadRequestObjectResult;
+
+            //assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(400, result.StatusCode);
+            Assert.AreEqual("Domínio inválido. Utilize o formato exemplo.com", result.Value);
+        }
+
+        [TestMethod]
+        public async Task Domain_Search_Service_Throws_Exception()
+        {
+            //arrange
+            var mockService = new Mock<IDomainService>();
+            mockService.Setup(s => s.GetDomainAsync("error.com"))
+                       .ThrowsAsync(new InvalidOperationException("Service Error"));
+
+            var controller = new DomainController(mockService.Object);
+
+            //act
+            var response = await controller.Get("error.com");
+            var result = response as NotFoundObjectResult;
+
+            //assert
+            Assert.IsNotNull(result);
+            Assert.AreEqual(404, result.StatusCode);
+             Assert.AreEqual("Service Error", result.Value);
         }
     }
 }

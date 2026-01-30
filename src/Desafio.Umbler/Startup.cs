@@ -43,6 +43,8 @@ namespace Desafio.Umbler
 
             services.AddScoped<Desafio.Umbler.Repositories.DomainRepository>();
             services.AddScoped<Desafio.Umbler.Interface.IDomainService, Desafio.Umbler.Service.DomainService>();
+            services.AddScoped<Desafio.Umbler.Interface.IWhoisClientWrapper, Desafio.Umbler.Service.WhoisClientWrapper>();
+            services.AddSingleton<DnsClient.ILookupClient>(new DnsClient.LookupClient());
             services.AddServerSideBlazor();
             services.AddControllersWithViews();
         }
